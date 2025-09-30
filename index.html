@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رسم القلب الشبكي - خطوة بخطوة</title>
+    <style>
+        /* CSS: لتصميم الصفحة */
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #000; /* خلفية سوداء */
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- HTML: عنصر لوحة الرسم -->
+    <canvas id="heartCanvas"></canvas>
+code
+Code
+<script>
+    // JavaScript: منطق رسم القلب الشبكي خطوة بخطوة
+
+    const canvas = document.getElementById('heartCanvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    function heart_function(t) {
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        return { x: x, y: -y };
+    }
+    
+    const numLayers = 10;
+    const numPoints = 150;
+    const maxScale = 20;
+    const heartLayers = [];
+
+    // حساب نقاط كل طبقة من طبقات القلب
+    for (let i = 0; i < numLayers; i++) {
+        const layerPoints = [];
+        const currentScale = maxScale * ((i + 1) / numLayers);
+        for (let j = 0; j <= numPoints; j++) {
+            const t = j * 2 * Math.PI / numPoints;
+            const point = heart_function(t);
+            layerPoints.push({
+                x: (canvas.width / 2) + point.x * currentScale,
+                y: (canvas.height / 2) + point.y * currentScale
+            });
+        }
+        heartLayers.push(layerPoints);
+    }
+    heartLayers.reverse();
+
+    // =================================================================
+    // ===== التعديل الجديد: تجميع كل الخطوط في قائمة واحدة =====
+    // =================================================================
+    
+    const allLines = [];
+
+    // تجميع الخطوط الشعاعية (بين الطبقات)
+    for (let i = 0; i < numLayers - 1; i++) {
+        for (let j = 0; j < numPoints; j++) {
+            const p1 = heartLayers[i][j];
+            const p2 = heartLayers[i + 1][j];
+            allLines.push({ start: p1, end: p2 });
+        }
+    }
+
+    // تجميع الخطوط المحيطية (على نفس الطبقة)
+    for (let i = 0; i < numLayers; i++) {
+        for (let j = 0; j < numPoints; j++) {
+            const p1 = heartLayers[i][j];
+            const p2 = heartLayers[i][j + 1];
+            allLines.push({ start: p1, end: p2 });
+        }
+    }
+    
+    // دالة لخلط ترتيب الخطوط بشكل عشوائي
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    // خلط القائمة لجعل الرسم عشوائياً
+    shuffle(allLines);
+
+    // إعدادات فرشاة الرسم
+    ctx.strokeStyle = '#ff005d';
+    ctx.lineWidth = 1;
+    ctx.shadowColor = '#ff005d';
+    ctx.shadowBlur = 10;
+    
+    // =================================================================
+    // ===== التعديل الجديد: دالة الرسوم المتحركة لرسم خط بخط =====
+    // =================================================================
+    
+    let currentLineIndex = 0;
+    const linesPerFrame = 15; // عدد الخطوط التي سيتم رسمها في كل إطار (يمكنك زيادة الرقم لتسريع الرسم)
+
+    function drawOneByOne() {
+        // استمر في الرسم طالما هناك خطوط متبقية
+        if (currentLineIndex >= allLines.length) {
+            return; // إيقاف الرسوم المتحركة
+        }
+        
+        // ارسم مجموعة من الخطوط في كل إطار لتحسين الأداء
+        const end = Math.min(currentLineIndex + linesPerFrame, allLines.length);
+        for (let i = currentLineIndex; i < end; i++) {
+            const line = allLines[i];
+            ctx.beginPath();
+            ctx.moveTo(line.start.x, line.start.y);
+            ctx.lineTo(line.end.x, line.end.y);
+            ctx.stroke();
+        }
+
+        currentLineIndex += linesPerFrame;
+        
+        // طلب الإطار التالي للرسوم المتحركة
+        requestAnimationFrame(drawOneByOne);
+    }
+
+    // بدء الرسوم المتحركة
+    drawOneByOne();
+</script>
+</body>
+</html>```
