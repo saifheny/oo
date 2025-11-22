@@ -312,7 +312,7 @@
                 }
             }, (err) => console.warn("GPS Error"), { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
             return () => navigator.geolocation.clearWatch(watchId);
-        }, [isOnline, activeTrip, tripStage, driver.photo]); // Added driver.photo dependency
+        }, [isOnline, activeTrip, tripStage, driver.photo]);
 
         // --- دوال المساعدة ---
         const updateDriverMarker = (lat, lng, heading) => {
@@ -448,8 +448,8 @@
 
                 <div id="map" className="flex-grow w-full h-full bg-gray-300 z-0"></div>
 
-                {/* Footer Panel */}
-                <div className="absolute bottom-0 w-full z-[1000]">
+                {/* Footer Panel - تم إضافة pb-10 لزيادة المساحة في الأسفل */}
+                <div className="absolute bottom-0 w-full z-[1000] p-4 pb-10">
                     
                     {/* 1. تفاوض */}
                     {incomingRequest && !activeTrip && (
@@ -471,6 +471,8 @@
                                 <button onClick={handleReject} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition">رفض</button>
                                 <button onClick={sendPriceToClient} className="flex-[2] py-3 bg-emerald-600 rounded-xl font-bold text-white shadow-lg">إرسال العرض</button>
                             </div>
+                            {/* مساحة إضافية صغيرة داخل الكارد */}
+                            <div className="h-2"></div>
                         </div>
                     )}
 
@@ -494,12 +496,14 @@
                             {tripStage === 'dropoff' && <button onClick={completeTrip} className="w-full py-4 bg-gray-800 rounded-xl font-bold text-white shadow-lg mb-2">إنهاء الرحلة</button>}
                             
                             {tripInfo.distance > 0 && tripStage !== 'arrived' && <div className="text-center text-xs text-gray-500 mt-2">متبقي: {tripInfo.distance} كم ({tripInfo.time} دقيقة)</div>}
+                            {/* مساحة إضافية صغيرة داخل الكارد */}
+                            <div className="h-2"></div>
                         </div>
                     )}
 
                     {/* 3. الافتراضي */}
                     {!incomingRequest && !activeTrip && (
-                        <div className="p-4">
+                        <div className="p-4 pb-6">
                             <button onClick={() => setIsOnline(!isOnline)} className={`w-full py-4 rounded-2xl font-extrabold text-lg shadow-xl transition-all flex justify-center items-center gap-2 ${isOnline ? 'bg-emerald-600 text-white' : 'bg-gray-600 text-white'}`}>
                                 <Icon name="power" size={24} />
                                 {isOnline ? 'أنت متصل (جاهز)' : 'غير متصل'}
