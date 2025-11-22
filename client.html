@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>عميل - طلب رحلة الآن</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Icons (Lucide) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f3f4f6;
+            overflow: hidden;
+        }
+        /* خلفية شاشة التسجيل */
+        .login-bg {
+            background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1517404215738-151c63b7e719?q=80&w=1000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .map-btn {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .map-btn:active { transform: scale(0.95); }
+        .blinking-dot {
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel" data-type="module">
+    // Firebase Realtime Database Imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onDisconnect, update, push, onValue, remove, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyCsnZdFrg-KlWFc0z6OgmXgBp6lPKf14fU",
+        authDomain: "saifsa-b51f1.firebaseapp.com",
+        databaseURL: "https://saifsa-b51f1-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "saifsa-b51f1",
+        storageBucket: "saifsa-b51f1.firebasestorage.app",
+        messagingSenderId: "41089917871",
+        appId: "1:41089917871:web:fce49f6f23bd4f679b055a",
+        measurementId: "G-4K733KS3CP"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // --- Icon Component ---
+    const Icon = ({ name, size = 24, color = "currentColor", className }) => {
+        const ref = React.useRef(null);
+        React.useEffect(() => {
+            if (ref.current) {
+                ref.current.innerHTML = '';
+                const i = document.createElement('i');
+                i.setAttribute('data-lucide', name);
+                i.setAttribute('class', className || '');
+                ref.current.appendChild(i);
+                lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, stroke: color } });
+            }
+        }, [name, size, color, className]);
+        return <span ref={ref} className="flex items-center justify-center"></span>;
+    };
+
+    // --- Client Dashboard ---
+    const Dashboard = ({ client, updateClientData }) => {
+        const [step, setStep] = React.useState('select_pickup'); // select_pickup, select_dropoff, confirm_trip, trip_active
+        const [pickup, setPickup] = React.useState(null);
+        const [dropoff, setDropoff] = React.useState(null);
+        const [status, setStatus] = React.useState('idle'); // idle, searching, accepted, on_trip
+        const [activeTrip, setActiveTrip] = React.useState(null);
+        const [driverLocation, setDriverLocation] = React.useState(null);
+        const [tripPrice, setTripPrice] = React.useState(null); // السعر الافتراضي
+
+        const mapRef = React.useRef(null);
+        const layersRef = React.useRef({});
+        const markersRef = React.useRef({});
+        const routeLineRef = React.useRef(null);
+        const currentWatchId = React.useRef(null);
+
+        // 1. تهيئة الخريطة وتحديد الموقع التلقائي
+        React.useEffect(() => {
+            if (!mapRef.current) {
+                mapRef.current = L.map('map', { zoomControl: false }).setView([30.0444, 31.2357], 13);
+                
+                layersRef.current.street = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap', maxZoom: 20 });
+                layersRef.current.street.addTo(mapRef.current);
+                
+                // تحديد الموقع الحالي للعميل
+                if (navigator.geolocation) {
+                    currentWatchId.current = navigator.geolocation.watchPosition(
+                        (pos) => {
+                            const { latitude, longitude } = pos.coords;
+                            if (step === 'select_pickup' && !pickup) {
+                                setPickup({ lat: latitude, lng: longitude, address: "موقعي الحالي" });
+                                mapRef.current.flyTo([latitude, longitude], 18);
+                            }
+                            updateClientMarker(latitude, longitude); // تحديث دائرة الموقع الأزرق للعميل
+                        },
+                        (err) => console.warn('Geolocation Error:', err.message),
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+                    );
+                } else {
+                    alert("المتصفح لا يدعم تحديد الموقع!");
+                }
+            }
+            return () => {
+                if (currentWatchId.current) navigator.geolocation.clearWatch(currentWatchId.current);
+            };
+        }, []);
+
+
+        // 2. إدارة علامات الموقع (Pickups/Dropoffs)
+        React.useEffect(() => {
+            if (!mapRef.current) return;
+            
+            // إزالة العلامات القديمة
+            Object.values(markersRef.current).forEach(m => m.remove());
+            markersRef.current = {};
+
+            // علامة الانطلاق (التقاط)
+            if (pickup) {
+                const pickupIcon = L.divIcon({
+                    className: 'client-pickup-marker',
+                    html: `<div class="w-8 h-8 bg-emerald-600 rounded-full border-2 border-white flex items-center justify-center shadow-lg text-white font-bold text-xs">من</div>`,
+                    iconSize: [32, 32]
+                });
+                markersRef.current.pickup = L.marker([pickup.lat, pickup.lng], { icon: pickupIcon }).addTo(mapRef.current)
+                    .bindPopup(`<b>نقطة الانطلاق:</b> ${pickup.address || 'محدد على الخريطة'}`).openPopup();
+            }
+
+            // علامة الوصول
+            if (dropoff) {
+                const dropoffIcon = L.divIcon({
+                    className: 'client-dropoff-marker',
+                    html: `<div class="w-8 h-8 bg-red-600 rounded-full border-2 border-white flex items-center justify-center shadow-lg text-white font-bold text-xs">إلى</div>`,
+                    iconSize: [32, 32]
+                });
+                markersRef.current.dropoff = L.marker([dropoff.lat, dropoff.lng], { icon: dropoffIcon }).addTo(mapRef.current)
+                    .bindPopup(`<b>نقطة الوصول:</b> ${dropoff.address || 'محدد على الخريطة'}`).openPopup();
+            }
+
+            // تحديد مجال الرؤية
+            if (pickup && dropoff) {
+                if (routeLineRef.current) routeLineRef.current.remove();
+                routeLineRef.current = L.polyline([[pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]], { color: '#3B82F6', weight: 4, dashArray: '10, 10' }).addTo(mapRef.current);
+                mapRef.current.fitBounds(L.latLngBounds([pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]), { padding: [50, 50] });
+                setTripPrice(Math.floor(Math.random() * (70 - 30 + 1)) + 30); // سعر افتراضي عشوائي
+            }
+
+        }, [pickup, dropoff]);
+
+        // 3. الاستماع لموقع السائق (عندما يكون هناك رحلة نشطة)
+        React.useEffect(() => {
+            if (!activeTrip || !activeTrip.driverId) return;
+
+            const driverRef = ref(db, `drivers/${activeTrip.driverId}`);
+            const unsubscribe = onValue(driverRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.lat && data.lng) {
+                    setDriverLocation({ lat: data.lat, lng: data.lng, name: data.name, photo: data.photo, plate: data.plate });
+                    updateDriverMarker(data);
+                }
+            });
+
+            return () => unsubscribe();
+        }, [activeTrip]);
+
+        // 4. الاستماع لحالة الطلب (عند البحث عن سائق)
+        React.useEffect(() => {
+            if (status !== 'searching' || !activeTrip || !activeTrip.requestId) return;
+
+            const requestRef = ref(db, `requests/${activeTrip.driverId}`);
+            const unsubscribe = onValue(requestRef, (snapshot) => {
+                const req = snapshot.val();
+                if (req && req.status === 'accepted') {
+                    setStatus('accepted');
+                    // تثبيت بيانات السائق
+                    get(ref(db, `drivers/${activeTrip.driverId}`)).then((s) => {
+                        const driverData = s.val();
+                        setActiveTrip(prev => ({
+                            ...prev, 
+                            driverName: driverData.name, 
+                            driverPhoto: driverData.photo,
+                            driverPlate: driverData.plate
+                        }));
+                    });
+                    setStep('trip_active');
+                } else if (req && req.status === 'rejected') {
+                    // إذا رفض السائق، نبدأ البحث مرة أخرى
+                    setStatus('idle');
+                    alert("السائق رفض الطلب. جاري البحث عن سائق آخر...");
+                    setTimeout(findNearestDriver, 2000); 
+                } else if (!req && status === 'accepted') {
+                     // هذا يعني أن السائق أنهى الرحلة (تمت إزالة الطلب)
+                    setStatus('idle');
+                    setActiveTrip(null);
+                    setDriverLocation(null);
+                    clearMapObjects();
+                    setStep('select_pickup');
+                    alert("وصلت لوجهتك! شكراً لاستخدامنا.");
+                }
+            });
+
+            return () => unsubscribe();
+        }, [status, activeTrip]);
+        
+        // --- دوال الخريطة ---
+
+        // إنشاء وتحديث دائرة موقع العميل (أزرق)
+        const updateClientMarker = (lat, lng) => {
+            if (markersRef.current.clientCircle) {
+                markersRef.current.clientCircle.setLatLng([lat, lng]);
+            } else {
+                markersRef.current.clientCircle = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: "#3B82F6",
+                    color: "#FFFFFF",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 1
+                }).addTo(mapRef.current);
+            }
+        };
+
+        // إنشاء وتحديث علامة السائق (صورة/سيارة)
+        const updateDriverMarker = (data) => {
+            if (!mapRef.current) return;
+            
+            const iconHtml = `
+                <div class="relative w-12 h-12 flex items-center justify-center">
+                    <div class="absolute inset-0 bg-yellow-500 rounded-full opacity-30 animate-pulse"></div>
+                    <div class="absolute inset-0 bg-white rounded-full border-2 border-yellow-500 shadow-md overflow-hidden flex items-center justify-center">
+                        <img src="${data.photo || 'https://placehold.co/48x48/F59E0B/FFFFFF?text=D'}" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            `;
+            const icon = L.divIcon({ className: 'custom-driver-client', html: iconHtml, iconSize: [48, 48], iconAnchor: [24, 24] });
+
+            if (markersRef.current.driver) {
+                markersRef.current.driver.setLatLng([data.lat, data.lng]).setIcon(icon);
+            } else {
+                markersRef.current.driver = L.marker([data.lat, data.lng], { icon }).addTo(mapRef.current);
+            }
+
+            // إذا كان في وضع القبول أو الرحلة، نركز على السائق ونقطة الانطلاق
+            if (status === 'accepted') {
+                const bounds = L.latLngBounds([data.lat, data.lng], [pickup.lat, pickup.lng]);
+                mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+            }
+        };
+        
+        const clearMapObjects = () => {
+             if (routeLineRef.current) { routeLineRef.current.remove(); routeLineRef.current = null; }
+             if (markersRef.current.driver) { markersRef.current.driver.remove(); markersRef.current.driver = null; }
+        };
+
+        const handleClick = (e) => {
+            if (status !== 'idle' || step === 'trip_active') return;
+
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const newLocation = { lat, lng, address: `(${lat.toFixed(4)}, ${lng.toFixed(4)})` };
+
+            if (step === 'select_pickup') {
+                setPickup(newLocation);
+                setStep('select_dropoff');
+            } else if (step === 'select_dropoff') {
+                setDropoff(newLocation);
+                setStep('confirm_trip');
+            }
+        };
+        
+        React.useEffect(() => {
+            if (mapRef.current && status === 'idle' && step !== 'trip_active') {
+                mapRef.current.on('click', handleClick);
+            }
+            return () => {
+                if (mapRef.current) mapRef.current.off('click', handleClick);
+            };
+        }, [step, status]);
+        
+        const recenterMap = () => {
+            if (pickup && mapRef.current) {
+                mapRef.current.flyTo([pickup.lat, pickup.lng], 18);
+            }
+        };
+
+        // --- وظيفة البحث عن سائق ---
+        const findNearestDriver = () => {
+            if (!pickup || !dropoff) return;
+
+            setStatus('searching');
+
+            // 1. نبحث عن كل السائقين الأونلاين (افتراضياً)
+            get(ref(db, 'drivers')).then((snapshot) => {
+                const driversData = snapshot.val();
+                if (!driversData) {
+                    setStatus('idle');
+                    alert("عفواً، لا يوجد سائقين متاحين حالياً.");
+                    return;
+                }
+
+                // فلترة السائقين الأونلاين
+                const availableDrivers = Object.keys(driversData)
+                    .map(key => ({ id: key, ...driversData[key] }))
+                    .filter(d => d.status === 'online' && d.lat && d.lng);
+
+                if (availableDrivers.length === 0) {
+                    setStatus('idle');
+                    alert("عفواً، لا يوجد سائقين متاحين حالياً.");
+                    return;
+                }
+
+                // في مثالنا البسيط، نختار أول سائق متاح (يمكن استبدالها بخوارزمية مسافة حقيقية)
+                const selectedDriver = availableDrivers[0];
+
+                // 2. إنشاء طلب الرحلة وإرساله للسائق
+                const requestId = push(ref(db, 'requests')).key; // إنشاء ID فريد للطلب
+
+                const tripData = {
+                    requestId: requestId,
+                    clientName: client.name,
+                    clientPhone: client.phone,
+                    pickupLat: pickup.lat,
+                    pickupLng: pickup.lng,
+                    pickupAddress: pickup.address,
+                    dropoffLat: dropoff.lat,
+                    dropoffLng: dropoff.lng,
+                    dropoffAddress: dropoff.address,
+                    driverId: selectedDriver.id, // السائق الذي سيتم إرسال الطلب له
+                    price: tripPrice,
+                    status: 'pending', // حالة الانتظار
+                    timestamp: Date.now()
+                };
+
+                // حفظ الطلب في مكان مخصص لـ DriverId
+                set(ref(db, `requests/${selectedDriver.id}`), tripData)
+                    .then(() => {
+                        setActiveTrip(tripData);
+                        alert(`تم إرسال الطلب للسائق ${selectedDriver.name}... في انتظار القبول.`);
+                    })
+                    .catch(error => {
+                        setStatus('idle');
+                        console.error("Error sending request:", error);
+                        alert("حدث خطأ أثناء إرسال الطلب.");
+                    });
+
+            }).catch(error => {
+                setStatus('idle');
+                console.error("Error fetching drivers:", error);
+                alert("حدث خطأ في الاتصال بالخوادم.");
+            });
+        };
+
+        // --- واجهة المستخدم (Render UI) ---
+        
+        let headerText = "أين تريد الذهاب؟";
+        let buttonContent = null;
+        let controlArea = null;
+
+        if (step === 'select_pickup') {
+             headerText = "حدد موقع الانطلاق (اضغط على الخريطة)";
+             controlArea = (
+                 <div className="flex flex-col gap-2">
+                    <p className="text-gray-500 text-sm">موقفك الحالي:</p>
+                    <div className="flex items-center gap-3 p-3 bg-gray-100 rounded-xl border border-gray-200">
+                         <Icon name="map-pin" size={20} className="text-emerald-600"/>
+                         <span className="font-bold text-gray-700">{pickup ? pickup.address : 'جاري تحديد الموقع...'}</span>
+                    </div>
+                    {pickup && <button onClick={() => setStep('select_dropoff')} className="w-full py-4 bg-emerald-600 rounded-xl font-bold text-white shadow-lg shadow-emerald-200">
+                        تأكيد الانطلاق وتحديد الوجهة
+                    </button>}
+                 </div>
+             );
+        } else if (step === 'select_dropoff') {
+            headerText = "حدد موقع الوصول (اضغط على الخريطة)";
+            controlArea = (
+                 <div className="flex flex-col gap-2">
+                    <p className="text-gray-500 text-sm">نقطة الوصول:</p>
+                    <div className="flex items-center justify-between p-3 bg-gray-100 rounded-xl border border-gray-200">
+                        <div className="flex items-center gap-3">
+                            <Icon name="flag" size={20} className="text-red-600"/>
+                            <span className="font-bold text-gray-700">{dropoff ? dropoff.address : 'اضغط على الخريطة...'}</span>
+                        </div>
+                        {dropoff && <button onClick={() => setDropoff(null)} className="text-red-500 text-sm">تغيير</button>}
+                    </div>
+                    {dropoff && <button onClick={() => setStep('confirm_trip')} className="w-full py-4 bg-emerald-600 rounded-xl font-bold text-white shadow-lg shadow-emerald-200">
+                        تأكيد الوجهة والمتابعة
+                    </button>}
+                 </div>
+            );
+        } else if (step === 'confirm_trip') {
+            headerText = "تأكيد طلب الرحلة";
+            controlArea = (
+                <div className="flex flex-col gap-3">
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 text-center">
+                        <div className="text-xs text-gray-500 mb-1">السعر التقديري للرحلة:</div>
+                        <div className="text-2xl font-extrabold text-blue-800">{tripPrice || '...'} ج.م</div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                            <Icon name="map-pin" size={18} className="text-emerald-600"/>
+                            <span className="font-bold">من:</span> {pickup.address}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Icon name="flag" size={18} className="text-red-600"/>
+                            <span className="font-bold">إلى:</span> {dropoff.address}
+                        </div>
+                    </div>
+
+                    {status === 'searching' ? (
+                        <div className="w-full py-4 bg-yellow-500 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-3">
+                            <span className="w-3 h-3 bg-white rounded-full blinking-dot"></span>
+                            جاري البحث عن أقرب سائق...
+                        </div>
+                    ) : (
+                         <button onClick={findNearestDriver} className="w-full py-4 bg-emerald-600 rounded-xl font-bold text-white shadow-lg hover:bg-emerald-700">
+                            اطلب رحلة الآن
+                        </button>
+                    )}
+                     <button onClick={() => setStep('select_pickup')} className="w-full py-2 text-sm text-gray-500">
+                        تغيير الوجهات
+                    </button>
+                </div>
+            );
+        } else if (step === 'trip_active' && activeTrip) {
+            headerText = status === 'accepted' ? "السائق في الطريق إليك" : "جارية الآن";
+            
+            let driverInfo = driverLocation ? (
+                 <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                    <img src={driverLocation.photo || 'https://placehold.co/48x48/F59E0B/FFFFFF?text=D'} className="w-12 h-12 rounded-full border-2 border-yellow-600 object-cover" />
+                    <div className="flex-1">
+                        <div className="font-bold text-gray-800">{activeTrip.driverName || driverLocation.name}</div>
+                        <div className="text-sm text-gray-600">{activeTrip.driverPlate || driverLocation.plate}</div>
+                    </div>
+                    <a href={`tel:${client.phone}`} className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-green-600">
+                        <Icon name="phone" size={20}/>
+                    </a>
+                </div>
+            ) : (
+                <div className="p-4 text-center text-sm text-gray-500">جاري تحميل بيانات السائق...</div>
+            );
+
+            controlArea = (
+                <div className="flex flex-col gap-3">
+                    {driverInfo}
+                    <div className="p-3 bg-blue-100 rounded-xl text-center font-bold text-blue-800">
+                        {status === 'accepted' ? 'السائق قادم إليك!' : 'أنت في الرحلة'}
+                    </div>
+                    <button onClick={() => {
+                        if (window.confirm("هل أنت متأكد من إلغاء الرحلة؟")) {
+                            if (activeTrip && activeTrip.driverId) {
+                                // إرسال إشارة إلغاء للسائق (بإزالة الطلب)
+                                remove(ref(db, `requests/${activeTrip.driverId}`));
+                            }
+                            setStatus('idle');
+                            setActiveTrip(null);
+                            setDriverLocation(null);
+                            clearMapObjects();
+                            setStep('select_pickup');
+                            alert("تم إلغاء الرحلة.");
+                        }
+                    }} className="w-full py-3 bg-red-100 text-red-600 rounded-xl font-bold">
+                        إلغاء الرحلة
+                    </button>
+                </div>
+            );
+        }
+        
+        return (
+            <div className="flex h-screen w-full bg-gray-100 overflow-hidden relative">
+                
+                {/* Header */}
+                <div className="absolute top-4 left-4 right-4 z-[1000]">
+                    <div className="glass-panel rounded-2xl p-3 flex justify-between items-center">
+                        <div className="font-bold text-lg text-emerald-600">تطبيق العميل</div>
+                        <div className="flex items-center gap-2">
+                            <img src={client.photo || 'https://placehold.co/40x40/34D399/FFFFFF?text=C'} className="w-10 h-10 rounded-full border object-cover" />
+                            <div className="font-bold text-sm">{client.name}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="map" className="flex-grow w-full h-full bg-gray-300 z-0"></div>
+
+                {/* Footer / Controls */}
+                <div className="absolute bottom-0 w-full z-[1000] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-5 mb-4 border-t-4 border-blue-500">
+                        <h2 className="text-xl font-bold mb-4 text-gray-800">{headerText}</h2>
+                        {controlArea}
+                    </div>
+                </div>
+
+                 {/* Map Controls */}
+                <div className="absolute top-24 left-4 z-[1000] flex flex-col gap-2">
+                    <button onClick={recenterMap} className="map-btn w-10 h-10 flex items-center justify-center text-blue-600" title="موقعي الحالي">
+                        <Icon name="crosshair" size={20} />
+                    </button>
+                </div>
+
+            </div>
+        );
+    };
+
+    // --- Login ---
+    const Login = ({ onLogin }) => {
+        const [formData, setFormData] = React.useState({ name: '', phone: '' });
+        const [img, setImg] = React.useState(null);
+        
+        const handleSubmit = (e) => {
+            e.preventDefault();
+            if(!formData.name || !formData.phone) return;
+            const data = { ...formData, id: formData.phone.replace(/\D/g,''), photo: img || "https://placehold.co/150x150/34D399/FFFFFF?text=C" };
+            onLogin(data);
+        };
+        const onImg = (e) => { const f=e.target.files[0]; if(f){ const r=new FileReader(); r.onload=()=>setImg(r.result); r.readAsDataURL(f); }};
+
+        return (
+            <div className="h-screen w-full flex items-center justify-center p-4 login-bg relative">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+                <div className="bg-white/95 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-md relative z-10">
+                    <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">تطبيق العميل</h1>
+                    <div className="relative w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-200 group cursor-pointer">
+                        {img ? <img src={img} className="w-full h-full object-cover"/> : <div className="flex items-center justify-center h-full text-gray-400"><Icon name="camera" size={32}/></div>}
+                        <input type="file" onChange={onImg} className="absolute inset-0 opacity-0 cursor-pointer"/>
+                    </div>
+                    <input placeholder="الاسم" className="w-full p-4 mb-3 border rounded-xl bg-gray-50 focus:bg-white" onChange={e=>setFormData({...formData, name:e.target.value})}/>
+                    <input placeholder="رقم الهاتف" className="w-full p-4 mb-6 border rounded-xl bg-gray-50 focus:bg-white" onChange={e=>setFormData({...formData, phone:e.target.value})}/>
+                    <button onClick={handleSubmit} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200">تسجيل الدخول</button>
+                </div>
+            </div>
+        );
+    };
+
+    const App = () => {
+        const [clientData, setClientData] = React.useState(null);
+        React.useEffect(() => { const s = localStorage.getItem('client_app_real'); if (s) setClientData(JSON.parse(s)); }, []);
+        const handleLogin = (d) => { setClientData(d); localStorage.setItem('client_app_real', JSON.stringify(d)); };
+        return clientData ? <Dashboard client={clientData} updateClientData={(d) => { setClientData(d); localStorage.setItem('client_app_real', JSON.stringify(d)); }} /> : <Login onLogin={handleLogin} />;
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+</script>
+</body>
+</html>
