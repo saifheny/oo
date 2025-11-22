@@ -2,137 +2,505 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رسم القلب الشبكي - خطوة بخطوة</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>كابتن - تحديد الموقع الدقيق</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Icons (Lucide) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
     <style>
-        /* CSS: لتصميم الصفحة */
         body {
-            margin: 0;
+            font-family: 'Cairo', sans-serif;
+            background-color: #f3f4f6;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #000; /* خلفية سوداء */
         }
-        canvas {
-            display: block;
+        /* خلفية شاشة التسجيل */
+        .login-bg {
+            background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=1000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .map-btn {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .map-btn:active { transform: scale(0.95); }
+        
+        /* نبض الموقع (تأثير الرادار) */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        .gps-pulse::before {
+            content: '';
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%; height: 100%;
+            background: rgba(16, 185, 129, 0.5);
+            border-radius: 50%;
+            z-index: -1;
+            animation: pulse-ring 2s infinite;
+        }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* تنبيه السحب */
+        .drag-hint {
+            animation: bounce 2s infinite;
         }
     </style>
 </head>
 <body>
-    <!-- HTML: عنصر لوحة الرسم -->
-    <canvas id="heartCanvas"></canvas>
-code
-Code
-<script>
-    // JavaScript: منطق رسم القلب الشبكي خطوة بخطوة
 
-    const canvas = document.getElementById('heartCanvas');
-    const ctx = canvas.getContext('2d');
+<div id="root"></div>
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+<script type="text/babel" data-type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onDisconnect, update, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    function heart_function(t) {
-        const x = 16 * Math.pow(Math.sin(t), 3);
-        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-        return { x: x, y: -y };
-    }
-    
-    const numLayers = 10;
-    const numPoints = 150;
-    const maxScale = 20;
-    const heartLayers = [];
+    const firebaseConfig = {
+        apiKey: "AIzaSyCsnZdFrg-KlWFc0z6OgmXgBp6lPKf14fU",
+        authDomain: "saifsa-b51f1.firebaseapp.com",
+        databaseURL: "https://saifsa-b51f1-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "saifsa-b51f1",
+        storageBucket: "saifsa-b51f1.firebasestorage.app",
+        messagingSenderId: "41089917871",
+        appId: "1:41089917871:web:fce49f6f23bd4f679b055a",
+        measurementId: "G-4K733KS3CP"
+    };
 
-    // حساب نقاط كل طبقة من طبقات القلب
-    for (let i = 0; i < numLayers; i++) {
-        const layerPoints = [];
-        const currentScale = maxScale * ((i + 1) / numLayers);
-        for (let j = 0; j <= numPoints; j++) {
-            const t = j * 2 * Math.PI / numPoints;
-            const point = heart_function(t);
-            layerPoints.push({
-                x: (canvas.width / 2) + point.x * currentScale,
-                y: (canvas.height / 2) + point.y * currentScale
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // --- Icon Component ---
+    const Icon = ({ name, size = 24, color = "currentColor", className }) => {
+        const ref = React.useRef(null);
+        React.useEffect(() => {
+            if (ref.current) {
+                ref.current.innerHTML = '';
+                const i = document.createElement('i');
+                i.setAttribute('data-lucide', name);
+                i.setAttribute('class', className || '');
+                ref.current.appendChild(i);
+                lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, stroke: color } });
+            }
+        }, [name, size, color, className]);
+        return <span ref={ref} className="flex items-center justify-center"></span>;
+    };
+
+    // --- Dashboard Component ---
+    const Dashboard = ({ driver, updateDriverData }) => {
+        const [isOnline, setIsOnline] = React.useState(true);
+        const [mapType, setMapType] = React.useState('street'); 
+        const [incomingRequest, setIncomingRequest] = React.useState(null);
+        const [activeTrip, setActiveTrip] = React.useState(null);
+        const [totalEarnings, setTotalEarnings] = React.useState(driver.totalEarnings || 0);
+        const [tripHistory, setTripHistory] = React.useState(driver.tripHistory || []);
+        const [showHistory, setShowHistory] = React.useState(false);
+        const [currentLocation, setCurrentLocation] = React.useState(null);
+        const [showDragHint, setShowDragHint] = React.useState(true); // تلميح السحب
+
+        const mapRef = React.useRef(null);
+        const layersRef = React.useRef({});
+        const driverMarkerRef = React.useRef(null);
+        const clientMarkerRef = React.useRef(null);
+        const destinationMarkerRef = React.useRef(null);
+        const routeLineRef = React.useRef(null);
+
+        // 1. تهيئة الخريطة
+        React.useEffect(() => {
+            if (!mapRef.current) {
+                // نبدأ بموقع افتراضي (القاهرة)
+                mapRef.current = L.map('map', { zoomControl: false }).setView([30.0444, 31.2357], 13);
+                
+                layersRef.current.street = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap', maxZoom: 20 });
+                layersRef.current.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri', maxZoom: 19 });
+                
+                layersRef.current.street.addTo(mapRef.current);
+            }
+        }, []);
+
+        // 2. تبديل نوع الخريطة
+        React.useEffect(() => {
+            if (!mapRef.current) return;
+            if (mapType === 'satellite') {
+                mapRef.current.removeLayer(layersRef.current.street);
+                mapRef.current.addLayer(layersRef.current.satellite);
+            } else {
+                mapRef.current.removeLayer(layersRef.current.satellite);
+                mapRef.current.addLayer(layersRef.current.street);
+            }
+        }, [mapType]);
+
+        // 3. الاستماع للطلبات
+        React.useEffect(() => {
+            const requestsRef = ref(db, `requests/${driver.id}`);
+            const unsubscribe = onValue(requestsRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    if (data.status === 'pending') {
+                        setIncomingRequest(data);
+                        showTripRoute(data.pickupLat, data.pickupLng, data.dropoffLat, data.dropoffLng);
+                    }
+                } else {
+                    if (incomingRequest && !activeTrip) {
+                        setIncomingRequest(null);
+                        clearTripMap();
+                    }
+                }
             });
-        }
-        heartLayers.push(layerPoints);
-    }
-    heartLayers.reverse();
+            return () => unsubscribe();
+        }, [driver.id, activeTrip]);
 
-    // =================================================================
-    // ===== التعديل الجديد: تجميع كل الخطوط في قائمة واحدة =====
-    // =================================================================
-    
-    const allLines = [];
+        // 4. GPS حقيقي
+        React.useEffect(() => {
+            if (!navigator.geolocation) {
+                alert("جهازك لا يدعم تحديد الموقع!");
+                return;
+            }
 
-    // تجميع الخطوط الشعاعية (بين الطبقات)
-    for (let i = 0; i < numLayers - 1; i++) {
-        for (let j = 0; j < numPoints; j++) {
-            const p1 = heartLayers[i][j];
-            const p2 = heartLayers[i + 1][j];
-            allLines.push({ start: p1, end: p2 });
-        }
-    }
+            const handleSuccess = (pos) => {
+                const { latitude, longitude } = pos.coords;
+                // فقط نقوم بالتحديث إذا لم يقم المستخدم بالسحب يدوياً مؤخراً (لمنع القفز أثناء السحب)
+                if (!driverMarkerRef.current || !driverMarkerRef.current.dragging?.enabled()) {
+                    updateDriverMarker(latitude, longitude);
+                }
+            };
 
-    // تجميع الخطوط المحيطية (على نفس الطبقة)
-    for (let i = 0; i < numLayers; i++) {
-        for (let j = 0; j < numPoints; j++) {
-            const p1 = heartLayers[i][j];
-            const p2 = heartLayers[i][j + 1];
-            allLines.push({ start: p1, end: p2 });
-        }
-    }
-    
-    // دالة لخلط ترتيب الخطوط بشكل عشوائي
-    function shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
+            const handleError = (err) => {
+                console.warn("جاري البحث عن الموقع...", err.message);
+            };
 
-    // خلط القائمة لجعل الرسم عشوائياً
-    shuffle(allLines);
+            const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, { 
+                enableHighAccuracy: true, 
+                maximumAge: 0, 
+                timeout: 10000 
+            });
+            
+            return () => navigator.geolocation.clearWatch(watchId);
+        }, [isOnline]);
 
-    // إعدادات فرشاة الرسم
-    ctx.strokeStyle = '#ff005d';
-    ctx.lineWidth = 1;
-    ctx.shadowColor = '#ff005d';
-    ctx.shadowBlur = 10;
-    
-    // =================================================================
-    // ===== التعديل الجديد: دالة الرسوم المتحركة لرسم خط بخط =====
-    // =================================================================
-    
-    let currentLineIndex = 0;
-    const linesPerFrame = 15; // عدد الخطوط التي سيتم رسمها في كل إطار (يمكنك زيادة الرقم لتسريع الرسم)
+        // --- دوال الخريطة ---
+        const updateDriverMarker = (lat, lng) => {
+            if (!mapRef.current) return;
+            
+            const iconHtml = `
+                <div class="relative w-12 h-12 flex items-center justify-center cursor-move">
+                    <div class="absolute inset-0 bg-emerald-500 rounded-full opacity-30 animate-ping"></div>
+                    <div class="absolute inset-0 bg-white rounded-full border-2 border-emerald-500 shadow-md overflow-hidden">
+                        <img src="${driver.photo}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="absolute -bottom-2 bg-black text-white text-[8px] px-1 rounded">اسحبني</div>
+                </div>
+            `;
+            const icon = L.divIcon({ className: 'custom-driver', html: iconHtml, iconSize: [48, 48], iconAnchor: [24, 24] });
 
-    function drawOneByOne() {
-        // استمر في الرسم طالما هناك خطوط متبقية
-        if (currentLineIndex >= allLines.length) {
-            return; // إيقاف الرسوم المتحركة
-        }
+            if (driverMarkerRef.current) {
+                // تحديث الموقع فقط، لا نعيد الإنشاء
+                 // نتأكد أننا لا نقاطع عملية السحب
+                if (!driverMarkerRef.current.dragging?.enabled() || !driverMarkerRef.current.dragging.moving()) {
+                     // driverMarkerRef.current.setLatLng([lat, lng]); // اختياري: يمكن إيقاف التحديث التلقائي إذا أردنا الاعتماد على السحب فقط
+                }
+            } else {
+                // إنشاء الماركر لأول مرة وجعله قابل للسحب
+                driverMarkerRef.current = L.marker([lat, lng], { 
+                    icon, 
+                    draggable: true // تفعيل السحب
+                }).addTo(mapRef.current);
+
+                // الانتقال للموقع
+                mapRef.current.setView([lat, lng], 18);
+                setCurrentLocation({ lat, lng });
+
+                // حفظ الموقع عند انتهاء السحب
+                driverMarkerRef.current.on('dragend', (e) => {
+                    const newPos = e.target.getLatLng();
+                    setCurrentLocation({ lat: newPos.lat, lng: newPos.lng });
+                    
+                    // تحديث Firebase فوراً بالموقع اليدوي
+                    update(ref(db, `drivers/${driver.id}`), { 
+                        lat: newPos.lat, 
+                        lng: newPos.lng,
+                        status: isOnline ? 'online' : 'offline'
+                    });
+                    
+                    setShowDragHint(false); // إخفاء التلميح بعد السحب
+                });
+            }
+        };
+
+        const recenterMap = () => {
+            if (currentLocation && mapRef.current) {
+                mapRef.current.flyTo([currentLocation.lat, currentLocation.lng], 18);
+            } else {
+                alert("يرجى الانتظار لتحديد الموقع أو اسحب الخريطة");
+            }
+        };
+
+        const showTripRoute = (pLat, pLng, dLat, dLng) => {
+            if (!mapRef.current) return;
+            
+            const pickupIcon = L.divIcon({
+                className: 'pickup-marker',
+                html: `<div class="w-8 h-8 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg text-white font-bold text-xs">من</div>`,
+                iconSize: [32, 32]
+            });
+            if (clientMarkerRef.current) clientMarkerRef.current.setLatLng([pLat, pLng]);
+            else clientMarkerRef.current = L.marker([pLat, pLng], { icon: pickupIcon }).addTo(mapRef.current);
+
+            if (dLat && dLng) {
+                const dropoffIcon = L.divIcon({
+                    className: 'dropoff-marker',
+                    html: `<div class="w-8 h-8 bg-red-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg text-white font-bold text-xs">إلى</div>`,
+                    iconSize: [32, 32]
+                });
+                if (destinationMarkerRef.current) destinationMarkerRef.current.setLatLng([dLat, dLng]);
+                else destinationMarkerRef.current = L.marker([dLat, dLng], { icon: dropoffIcon }).addTo(mapRef.current);
+
+                if (routeLineRef.current) routeLineRef.current.remove();
+                routeLineRef.current = L.polyline([[pLat, pLng], [dLat, dLng]], { color: '#3B82F6', weight: 4, dashArray: '10, 10' }).addTo(mapRef.current);
+                
+                mapRef.current.fitBounds(L.latLngBounds([pLat, pLng], [dLat, dLng]), { padding: [50, 50] });
+            } else {
+                mapRef.current.setView([pLat, pLng], 16);
+            }
+        };
+
+        const clearTripMap = () => {
+            if (clientMarkerRef.current) { clientMarkerRef.current.remove(); clientMarkerRef.current = null; }
+            if (destinationMarkerRef.current) { destinationMarkerRef.current.remove(); destinationMarkerRef.current = null; }
+            if (routeLineRef.current) { routeLineRef.current.remove(); routeLineRef.current = null; }
+            if (currentLocation) recenterMap();
+        };
+
+        // --- Actions ---
+        const acceptRequest = () => {
+            if (!incomingRequest) return;
+            update(ref(db, `requests/${driver.id}`), { status: 'accepted' });
+            setActiveTrip({ ...incomingRequest, startTime: Date.now() });
+            setIncomingRequest(null);
+        };
+
+        const rejectRequest = () => {
+            update(ref(db, `requests/${driver.id}`), { status: 'rejected' });
+            setIncomingRequest(null);
+            clearTripMap();
+            setTimeout(() => { remove(ref(db, `requests/${driver.id}`)); }, 2000);
+        };
+
+        const completeTrip = () => {
+            const price = 50; 
+            const newEarnings = parseFloat(totalEarnings) + price;
+            setTotalEarnings(newEarnings);
+            
+            const historyItem = {
+                id: activeTrip.requestId,
+                clientName: activeTrip.clientName,
+                destination: activeTrip.dropoffAddress || 'مشوار',
+                price: price,
+                date: new Date().toLocaleDateString('ar-EG'),
+                timestamp: Date.now()
+            };
+            
+            const newHistory = [historyItem, ...tripHistory];
+            setTripHistory(newHistory);
+            updateDriverData({ ...driver, totalEarnings: newEarnings, tripHistory: newHistory });
+            update(ref(db, `drivers/${driver.id}`), { totalEarnings: newEarnings });
+            remove(ref(db, `requests/${driver.id}`)); 
+            setActiveTrip(null);
+            clearTripMap();
+            alert(`تم إنهاء الرحلة. الرصيد: +${price} ج.م`);
+        };
+
+        return (
+            <div className="flex h-screen w-full bg-gray-100 overflow-hidden relative">
+                
+                {/* القائمة الجانبية */}
+                <div className={`fixed inset-y-0 right-0 z-[2000] w-72 bg-white shadow-2xl transform transition-transform duration-300 ${showHistory ? 'translate-x-0' : 'translate-x-full'}`}>
+                    <div className="p-5 bg-emerald-600 text-white flex justify-between items-center">
+                        <h2 className="font-bold">سجل الرحلات</h2>
+                        <button onClick={() => setShowHistory(false)}><Icon name="x" /></button>
+                    </div>
+                    <div className="p-4 overflow-y-auto h-full pb-20 custom-scroll">
+                        {tripHistory.map(t => (
+                            <div key={t.timestamp} className="mb-3 p-3 border rounded-lg bg-gray-50">
+                                <div className="flex justify-between font-bold text-sm">
+                                    <span>{t.clientName}</span>
+                                    <span className="text-emerald-600">+{t.price}</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">{t.destination}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* المحتوى */}
+                <div className="flex-1 flex flex-col relative h-full w-full">
+                    
+                    {/* Header */}
+                    <div className="absolute top-4 left-4 right-4 z-[1000]">
+                        <div className="glass-panel rounded-2xl p-3 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <img src={driver.photo} className="w-10 h-10 rounded-full border object-cover" />
+                                <div>
+                                    <div className="font-bold text-sm">{driver.name}</div>
+                                    <div className="text-xs text-gray-500 font-mono">{driver.plate}</div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowHistory(true)} className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <Icon name="history" size={20} className="text-gray-600"/>
+                                </button>
+                                <div className="bg-emerald-50 px-3 py-2 rounded-lg text-center border border-emerald-100">
+                                    <div className="text-xs text-gray-400">اليوم</div>
+                                    <div className="font-bold text-emerald-600 text-sm">{totalEarnings} ج.م</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* تنبيه السحب اليدوي */}
+                    {showDragHint && (
+                        <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-[1000] bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold drag-hint pointer-events-none flex items-center gap-2">
+                            <Icon name="move" size={16} />
+                            إذا كان الموقع غير دقيق، اسحب صورتك لمكانك الصحيح
+                        </div>
+                    )}
+
+                    {/* Map Controls */}
+                    <div className="absolute top-24 left-4 z-[1000] flex flex-col gap-2">
+                        <button onClick={() => setMapType('street')} className={`map-btn w-10 h-10 flex items-center justify-center ${mapType === 'street' ? 'ring-2 ring-emerald-500' : ''}`}><Icon name="map" size={20} className="text-gray-700" /></button>
+                        <button onClick={() => setMapType('satellite')} className={`map-btn w-10 h-10 flex items-center justify-center ${mapType === 'satellite' ? 'ring-2 ring-emerald-500' : ''}`}><Icon name="globe" size={20} className="text-gray-700" /></button>
+                        <button onClick={recenterMap} className="map-btn w-10 h-10 flex items-center justify-center text-blue-600" title="موقعي الحالي">
+                            <Icon name="crosshair" size={20} />
+                        </button>
+                    </div>
+
+                    <div id="map" className="flex-grow w-full h-full bg-gray-300 z-0"></div>
+
+                    {/* Footer / Requests */}
+                    <div className="absolute bottom-0 w-full z-[1000] p-4">
+                        
+                        {incomingRequest && !activeTrip && (
+                            <div className="bg-white rounded-2xl shadow-2xl p-5 mb-4 border-t-4 border-yellow-400">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded inline-block">طلب جديد!</div>
+                                    <div className="text-sm font-bold text-gray-400">مسافة قريبة</div>
+                                </div>
+                                <h3 className="text-lg font-bold mb-1">{incomingRequest.clientName}</h3>
+                                <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+                                    <span className="w-2 h-2 rounded-full bg-red-500 block"></span>
+                                    <span>إلى: {incomingRequest.dropoffAddress || "وجهة محددة على الخريطة"}</span>
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <button onClick={rejectRequest} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-600">رفض</button>
+                                    <button onClick={acceptRequest} className="flex-[2] py-3 bg-emerald-600 rounded-xl font-bold text-white shadow-lg shadow-emerald-200">قبول الرحلة</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTrip && (
+                            <div className="bg-white rounded-2xl shadow-2xl p-5 mb-4 border-t-4 border-emerald-500">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="flex flex-col">
+                                        <div className="text-xs text-gray-400">العميل</div>
+                                        <div className="font-bold text-gray-800">{activeTrip.clientName}</div>
+                                    </div>
+                                    {/* زر الاتصال الحقيقي */}
+                                    <a href={`tel:${activeTrip.clientPhone}`} className="w-12 h-12 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-green-600">
+                                        <Icon name="phone" size={24}/>
+                                    </a>
+                                </div>
+                                <button onClick={completeTrip} className="w-full py-4 bg-emerald-600 rounded-xl font-bold text-white shadow-lg">
+                                    ✅ إنهاء الرحلة
+                                </button>
+                            </div>
+                        )}
+
+                        {!incomingRequest && !activeTrip && (
+                            <button 
+                                onClick={() => setIsOnline(!isOnline)}
+                                className={`w-full py-4 rounded-2xl font-extrabold text-lg shadow-xl transition-all flex justify-center items-center gap-3
+                                    ${isOnline ? 'bg-emerald-600 text-white ring-4 ring-emerald-100' : 'bg-gray-600 text-white ring-4 ring-gray-200'}`}
+                            >
+                                <Icon name="power" size={24} />
+                                {isOnline ? 'أنت متصل (جاهز)' : 'غير متصل'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // --- Login ---
+    const Login = ({ onLogin }) => {
+        const [formData, setFormData] = React.useState({ name: '', phone: '', plate: '' });
+        const [img, setImg] = React.useState(null);
         
-        // ارسم مجموعة من الخطوط في كل إطار لتحسين الأداء
-        const end = Math.min(currentLineIndex + linesPerFrame, allLines.length);
-        for (let i = currentLineIndex; i < end; i++) {
-            const line = allLines[i];
-            ctx.beginPath();
-            ctx.moveTo(line.start.x, line.start.y);
-            ctx.lineTo(line.end.x, line.end.y);
-            ctx.stroke();
-        }
+        const handleSubmit = (e) => {
+            e.preventDefault();
+            if(!formData.name) return;
+            const data = { ...formData, id: formData.phone.replace(/\D/g,''), photo: img || "https://via.placeholder.com/150", totalEarnings: 0 };
+            onLogin(data);
+        };
+        const onImg = (e) => { const f=e.target.files[0]; if(f){ const r=new FileReader(); r.onload=()=>setImg(r.result); r.readAsDataURL(f); }};
 
-        currentLineIndex += linesPerFrame;
-        
-        // طلب الإطار التالي للرسوم المتحركة
-        requestAnimationFrame(drawOneByOne);
-    }
+        return (
+            <div className="h-screen w-full flex items-center justify-center p-4 login-bg relative">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+                <div className="bg-white/95 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-md relative z-10">
+                    <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">بوابة الكباتن</h1>
+                    <div className="relative w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-200 group cursor-pointer">
+                        {img ? <img src={img} className="w-full h-full object-cover"/> : <div className="flex items-center justify-center h-full text-gray-400"><Icon name="camera" size={32}/></div>}
+                        <input type="file" onChange={onImg} className="absolute inset-0 opacity-0 cursor-pointer"/>
+                    </div>
+                    <input placeholder="الاسم ثلاثي" className="w-full p-4 mb-3 border rounded-xl bg-gray-50 focus:bg-white" onChange={e=>setFormData({...formData, name:e.target.value})}/>
+                    <input placeholder="رقم الهاتف" className="w-full p-4 mb-3 border rounded-xl bg-gray-50 focus:bg-white" onChange={e=>setFormData({...formData, phone:e.target.value})}/>
+                    <input placeholder="رقم اللوحة" className="w-full p-4 mb-6 border rounded-xl bg-gray-50 focus:bg-white" onChange={e=>setFormData({...formData, plate:e.target.value})}/>
+                    <button onClick={handleSubmit} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-emerald-200">تسجيل الدخول</button>
+                </div>
+            </div>
+        );
+    };
 
-    // بدء الرسوم المتحركة
-    drawOneByOne();
+    const App = () => {
+        const [driverData, setDriverData] = React.useState(null);
+        React.useEffect(() => { const s = localStorage.getItem('driver_app_real'); if (s) setDriverData(JSON.parse(s)); }, []);
+        const handleLogin = (d) => { setDriverData(d); localStorage.setItem('driver_app_real', JSON.stringify(d)); };
+        return driverData ? <Dashboard driver={driverData} updateDriverData={(d) => { setDriverData(d); localStorage.setItem('driver_app_real', JSON.stringify(d)); }} /> : <Login onLogin={handleLogin} />;
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
 </script>
 </body>
-</html>```
+</html>
