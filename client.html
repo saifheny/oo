@@ -44,6 +44,7 @@
         
         #map { width: 100%; height: 100%; z-index: 0; position: absolute; top: 0; left: 0; }
         
+        /* Map UI Elements */
         .map-picker-ui {
             pointer-events: none; position: absolute; inset: 0; z-index: 1000;
             display: flex; flex-direction: column; justify-content: space-between;
@@ -87,6 +88,7 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+        /* Map Theme Switcher Styles */
         .map-theme-btn {
             position: absolute; top: 60px; left: 16px; z-index: 900;
             background: white; width: 44px; height: 44px; border-radius: 12px;
@@ -118,50 +120,33 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // --- بيانات المناطق والمحافظات (Static Data) ---
-    // هذه البيانات تحاكي قاعدة بيانات المناطق
-    const GOVERNORATES_DATA = {
-        "القاهرة": [
-            { name: "مدينة نصر", lat: 30.0561, lng: 31.3301 },
-            { name: "المعادي", lat: 29.9602, lng: 31.2569 },
-            { name: "التجمع الخامس", lat: 30.0055, lng: 31.4290 },
-            { name: "وسط البلد", lat: 30.0444, lng: 31.2357 },
-            { name: "مصر الجديدة", lat: 30.0890, lng: 31.3283 },
-            { name: "شبرا", lat: 30.0763, lng: 31.2464 },
-            { name: "الزمالك", lat: 30.0636, lng: 31.2260 },
-            { name: "الرحاب", lat: 30.0596, lng: 31.4939 }
-        ],
-        "الجيزة": [
-            { name: "الدقي", lat: 30.0385, lng: 31.2127 },
-            { name: "الهرم", lat: 29.9972, lng: 31.1396 },
-            { name: "6 أكتوبر", lat: 29.9745, lng: 30.9430 },
-            { name: "المهندسين", lat: 30.0511, lng: 31.2045 },
-            { name: "فيصل", lat: 30.0074, lng: 31.1712 },
-            { name: "الشيخ زايد", lat: 30.0446, lng: 30.9836 },
-            { name: "العجوزة", lat: 30.0560, lng: 31.2119 },
-            { name: "إمبابة", lat: 30.0759, lng: 31.2030 }
-        ],
-        "الإسكندرية": [
-            { name: "سموحة", lat: 31.2156, lng: 29.9515 },
-            { name: "ميامي", lat: 31.2681, lng: 30.0039 },
-            { name: "المنتزه", lat: 31.2862, lng: 30.0210 },
-            { name: "محطة الرمل", lat: 31.2001, lng: 29.9009 },
-            { name: "العجمي", lat: 31.1027, lng: 29.7744 }
-        ],
-        "القليوبية": [
-            { name: "بنها", lat: 30.4626, lng: 31.1793 },
-            { name: "شبرا الخيمة", lat: 30.1226, lng: 31.2425 },
-            { name: "قليوب", lat: 30.1834, lng: 31.2163 },
-            { name: "العبور", lat: 30.2281, lng: 31.4729 }
-        ]
-    };
-
+    // --- بيانات أنماط الخريطة ---
     const MAP_STYLES = {
-        standard: { name: "قياسي", url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', preview: 'bg-gray-100' },
-        satellite: { name: "قمر صناعي", url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', preview: 'bg-green-800' },
-        dark: { name: "داكن", url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', preview: 'bg-gray-900' },
-        light: { name: "فاتح", url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', preview: 'bg-gray-200' },
-        voyager: { name: "ملاحة", url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', preview: 'bg-blue-100' }
+        standard: { 
+            name: "قياسي", 
+            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            preview: 'bg-gray-100'
+        },
+        satellite: { 
+            name: "قمر صناعي", 
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            preview: 'bg-green-800'
+        },
+        dark: { 
+            name: "داكن", 
+            url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            preview: 'bg-gray-900'
+        },
+        light: { 
+            name: "فاتح", 
+            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            preview: 'bg-gray-200'
+        },
+        voyager: {
+            name: "ملاحة",
+            url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+            preview: 'bg-blue-100'
+        }
     };
 
     const Icon = ({ name, size = 24, className, onClick }) => {
@@ -181,33 +166,24 @@
 
     // --- مكون تسجيل الدخول ---
     const Login = ({ onLogin }) => {
-        const [formData, setFormData] = React.useState({ name: '', phone: '', governorate: '' });
-        const [errors, setErrors] = React.useState({ name: '', phone: '', governorate: '' });
+        const [formData, setFormData] = React.useState({ name: '', phone: '' });
+        const [errors, setErrors] = React.useState({ name: '', phone: '' });
         const [showConfirm, setShowConfirm] = React.useState(false);
 
         const validateAndProceed = () => {
             let newErrors = {};
             let isValid = true;
-            
             const nameParts = formData.name.trim().split(/\s+/);
             if (nameParts.length < 3) { newErrors.name = "يجب إدخال الاسم ثلاثي على الأقل."; isValid = false; }
-            
             const phoneRegex = /^01[0125][0-9]{8}$/;
             const cleanPhone = formData.phone.replace(/\D/g, ''); 
             if (!phoneRegex.test(cleanPhone)) { newErrors.phone = "يجب إدخال رقم هاتف محمول صحيح (11 رقم)."; isValid = false; }
-            
-            if (!formData.governorate) { newErrors.governorate = "يرجى اختيار المحافظة."; isValid = false; }
-
             setErrors(newErrors);
             if (isValid) { setFormData({ ...formData, phone: cleanPhone }); setShowConfirm(true); }
         };
 
         const handleFinalLogin = () => {
-            onLogin({ 
-                ...formData, 
-                id: formData.phone, 
-                photo: "https://placehold.co/150x150/000/FFFFFF?text=" + formData.name.charAt(0) 
-            });
+            onLogin({ ...formData, id: formData.phone, photo: "https://placehold.co/150x150/000/FFFFFF?text=" + formData.name.charAt(0) });
         };
 
         return (
@@ -216,11 +192,8 @@
                     <div className="absolute inset-0 modal-overlay flex items-center justify-center p-6 animate-[fadeIn_0.2s]">
                         <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl transform scale-100 animate-[scaleIn_0.2s]">
                             <div className="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-500"><Icon name="alert-circle" size={32} /></div>
-                            <h3 className="text-xl font-bold text-center mb-2">تأكيد البيانات</h3>
-                            <p className="text-center text-gray-500 mb-6 text-sm">
-                                الرقم: <span className="font-bold text-black">{formData.phone}</span><br/>
-                                المحافظة: <span className="font-bold text-black">{formData.governorate}</span>
-                            </p>
+                            <h3 className="text-xl font-bold text-center mb-2">تأكيد الرقم</h3>
+                            <p className="text-center text-gray-500 mb-6 text-sm">هل أنت متأكد من أن هذا الرقم صحيح؟<br/><span className="text-2xl font-black text-black block mt-2 tracking-widest">{formData.phone}</span></p>
                             <div className="flex gap-3">
                                 <button onClick={() => setShowConfirm(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">تعديل</button>
                                 <button onClick={handleFinalLogin} className="flex-1 py-3 bg-black text-white font-bold rounded-xl shadow-lg">نعم، صحيح</button>
@@ -233,32 +206,17 @@
                     <h1 className="text-4xl font-black text-gray-900 mb-2">توصيلة</h1>
                     <p className="text-gray-400 text-center px-8 font-medium">سجل بياناتك لتبدأ رحلتك.</p>
                 </div>
-                <div className="w-full space-y-3 mb-4">
-                    {/* الاسم */}
+                <div className="w-full space-y-4 mb-4">
                     <div className={`bg-gray-50 p-4 rounded-2xl border transition ${errors.name ? 'border-red-500 bg-red-50' : 'border-gray-100 focus-within:border-black'}`}>
                         <label className={`block text-xs font-bold mb-1 ${errors.name ? 'text-red-500' : 'text-gray-400'}`}>الاسم بالكامل (ثلاثي)</label>
-                        <input className="w-full bg-transparent font-bold text-lg outline-none text-gray-900" placeholder="الاسم الأول - الأب - الجد" value={formData.name} onChange={e => { setFormData({...formData, name:e.target.value}); if(errors.name) setErrors({...errors, name: ''}); }} />
+                        <input className="w-full bg-transparent font-bold text-lg outline-none text-gray-900 placeholder:text-gray-300" placeholder="الاسم الأول - الأب - الجد" value={formData.name} onChange={e => { setFormData({...formData, name:e.target.value}); if(errors.name) setErrors({...errors, name: ''}); }} />
                     </div>
-                    {/* الهاتف */}
+                    {errors.name && <p className="text-red-500 text-xs font-bold px-2 -mt-2">{errors.name}</p>}
                     <div className={`bg-gray-50 p-4 rounded-2xl border transition ${errors.phone ? 'border-red-500 bg-red-50' : 'border-gray-100 focus-within:border-black'}`}>
                         <label className={`block text-xs font-bold mb-1 ${errors.phone ? 'text-red-500' : 'text-gray-400'}`}>رقم الهاتف</label>
-                        <input className="w-full bg-transparent font-bold text-lg outline-none text-gray-900" placeholder="01xxxxxxxxx" type="tel" maxLength="11" value={formData.phone} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData({...formData, phone: val}); if(errors.phone) setErrors({...errors, phone: ''}); }} />
+                        <input className="w-full bg-transparent font-bold text-lg outline-none text-gray-900 placeholder:text-gray-300" placeholder="01xxxxxxxxx" type="tel" maxLength="11" value={formData.phone} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData({...formData, phone: val}); if(errors.phone) setErrors({...errors, phone: ''}); }} />
                     </div>
-                    {/* اختيار المحافظة */}
-                    <div className={`bg-gray-50 p-4 rounded-2xl border transition ${errors.governorate ? 'border-red-500 bg-red-50' : 'border-gray-100 focus-within:border-black'}`}>
-                        <label className={`block text-xs font-bold mb-1 ${errors.governorate ? 'text-red-500' : 'text-gray-400'}`}>المحافظة</label>
-                        <select 
-                            className="w-full bg-transparent font-bold text-lg outline-none text-gray-900"
-                            value={formData.governorate}
-                            onChange={e => { setFormData({...formData, governorate:e.target.value}); if(errors.governorate) setErrors({...errors, governorate: ''}); }}
-                        >
-                            <option value="">اختر محافظتك...</option>
-                            {Object.keys(GOVERNORATES_DATA).map(gov => (
-                                <option key={gov} value={gov}>{gov}</option>
-                            ))}
-                        </select>
-                    </div>
-
+                    {errors.phone && <p className="text-red-500 text-xs font-bold px-2 -mt-2">{errors.phone}</p>}
                     <button onClick={validateAndProceed} className="w-full bg-black text-white py-4 rounded-2xl font-bold text-lg shadow-xl active:scale-95 transition mt-4">متابعة</button>
                 </div>
             </div>
@@ -277,19 +235,19 @@
         const [isMapMoving, setIsMapMoving] = React.useState(false);
         const [shortAddress, setShortAddress] = React.useState("طريق بدون اسم");
         
-        // البحث والوجهات
+        // البحث
         const [pickupText, setPickupText] = React.useState('');
         const [dropoffText, setDropoffText] = React.useState('');
-        const [filteredDestinations, setFilteredDestinations] = React.useState([]); // القائمة التي تظهر في البحث
-        const [recentDestinations, setRecentDestinations] = React.useState([]); // سجل البحث المحفوظ
-
+        const [suggestions, setSuggestions] = React.useState([]);
+        const [activeField, setActiveField] = React.useState(null);
+        
         // السائقين والرحلة
         const [availableDrivers, setAvailableDrivers] = React.useState([]);
         const [tripInfo, setTripInfo] = React.useState({ distance: 0, time: 0 });
-        const [showMapPreview, setShowMapPreview] = React.useState(false);
+        const [showMapPreview, setShowMapPreview] = React.useState(false); // حالة لرؤية الخريطة من قائمة السائقين
 
-        // ستايل الخريطة (مع الحفظ)
-        const [mapStyle, setMapStyle] = React.useState(() => localStorage.getItem('app_map_style') || 'standard');
+        // ستايل الخريطة
+        const [mapStyle, setMapStyle] = React.useState('standard');
         const [showStyleMenu, setShowStyleMenu] = React.useState(false);
 
         const mapRef = React.useRef(null);
@@ -297,28 +255,13 @@
         const routingControlRef = React.useRef(null);
         const markersRef = React.useRef({});
 
-        // --- تحميل سجل الوجهات ---
-        React.useEffect(() => {
-            const savedRecents = localStorage.getItem('recent_destinations');
-            if (savedRecents) {
-                setRecentDestinations(JSON.parse(savedRecents));
-            }
-        }, []);
-
-        // --- وظيفة لإضافة وجهة للسجل ---
-        const addToHistory = (destination) => {
-            let newRecents = [destination, ...recentDestinations.filter(d => d.name !== destination.name)];
-            // نحتفظ بآخر 5 فقط
-            if (newRecents.length > 5) newRecents = newRecents.slice(0, 5);
-            setRecentDestinations(newRecents);
-            localStorage.setItem('recent_destinations', JSON.stringify(newRecents));
-        };
-
-        // --- تهيئة الخريطة ---
+        // --- تهيئة وتحديث الخريطة ---
         React.useEffect(() => {
             if (!mapRef.current) {
                 mapRef.current = L.map('map', { zoomControl: false, attributionControl: false }).setView([30.0444, 31.2357], 15);
-                tileLayerRef.current = L.tileLayer(MAP_STYLES[mapStyle].url, { maxZoom: 19 }).addTo(mapRef.current);
+                
+                // إضافة طبقة الخريطة الافتراضية
+                tileLayerRef.current = L.tileLayer(MAP_STYLES.standard.url, { maxZoom: 19 }).addTo(mapRef.current);
                 
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     const { latitude, longitude } = pos.coords;
@@ -341,12 +284,11 @@
             }
         }, [view]);
 
-        // تغيير وحفظ ستايل الخريطة
+        // تغيير ستايل الخريطة
         React.useEffect(() => {
             if (mapRef.current && tileLayerRef.current) {
                 mapRef.current.removeLayer(tileLayerRef.current);
                 tileLayerRef.current = L.tileLayer(MAP_STYLES[mapStyle].url, { maxZoom: 19 }).addTo(mapRef.current);
-                localStorage.setItem('app_map_style', mapStyle);
             }
         }, [mapStyle]);
 
@@ -361,46 +303,28 @@
             } catch (e) { return { short: "موقع محدد", full: "موقع على الخريطة" }; }
         };
 
-        // --- منطق البحث المتقدم للواجهة الجديدة ---
-        const handleSearchInput = (text) => {
-            setDropoffText(text);
-            
-            // 1. تصفية مناطق المحافظة
-            const govAreas = GOVERNORATES_DATA[client.governorate] || [];
-            let results = [];
-
-            if (text.length === 0) {
-                // إذا كان الحقل فارغاً، نعرض: السجل + كل مناطق المحافظة
-                results = [
-                    ...recentDestinations.map(d => ({ ...d, type: 'history' })),
-                    ...govAreas.map(d => ({ ...d, type: 'popular' }))
-                ];
-            } else {
-                // إذا كان يكتب، نبحث في مناطق المحافظة
-                const localMatches = govAreas.filter(area => area.name.includes(text)).map(d => ({ ...d, type: 'popular' }));
-                
-                // (يمكن إضافة بحث اونلاين هنا لو أردت، لكن سنكتفي بالمحلي للسرعة كما طلبت)
-                results = localMatches;
-            }
-            setFilteredDestinations(results);
+        const handleSearch = async (text, field) => {
+            if (field === 'pickup') setPickupText(text); else setDropoffText(text);
+            setActiveField(field);
+            if (text.length > 2) {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${text}&countrycodes=eg&accept-language=ar&limit=5`);
+                    const data = await res.json();
+                    setSuggestions(data);
+                } catch(e) {}
+            } else { setSuggestions([]); }
         };
 
-        // عند فتح واجهة الإدخال، نملأ القائمة بالمقترحات الافتراضية
-        React.useEffect(() => {
-            if (view === 'LOCATION_INPUT') {
-                handleSearchInput('');
-            }
-        }, [view]);
-
-        const selectDestination = (item) => {
-            setDropoff({ lat: item.lat, lng: item.lng, address: item.name });
-            setDropoffText(item.name);
-            addToHistory({ name: item.name, lat: item.lat, lng: item.lng }); // إضافة للسجل
-            setFilteredDestinations([]);
+        const selectSuggestion = (item) => {
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.lon);
+            const name = item.display_name.split(',').slice(0, 2).join('، ');
+            if (activeField === 'pickup') { setPickup({ lat, lng, address: name }); setPickupText(name); } 
+            else { setDropoff({ lat, lng, address: name }); setDropoffText(name); }
+            setSuggestions([]);
             document.activeElement.blur();
         };
 
-        // ... (Drawing Route Logic - Same as before)
         React.useEffect(() => {
             if (!mapRef.current) return;
             setTimeout(() => mapRef.current.invalidateSize(), 100);
@@ -413,6 +337,7 @@
                 else if (pickup) mapRef.current.setView([pickup.lat, pickup.lng], 16);
             } 
             else if (view === 'DRIVER_SELECT' && pickup && dropoff) {
+                // رسم المسار
                 const pIcon = L.divIcon({ className: 'p-marker', html: '<div class="w-3 h-3 bg-black rounded-full border-2 border-white box-content shadow-md"></div>' });
                 const dIcon = L.divIcon({ className: 'd-marker', html: '<div class="w-3 h-3 bg-black rounded-sm border-2 border-white box-content shadow-md"></div>' });
                 markersRef.current.p = L.marker([pickup.lat, pickup.lng], {icon: pIcon}).addTo(mapRef.current);
@@ -434,19 +359,14 @@
             const center = mapRef.current.getCenter();
             const locationData = { lat: center.lat, lng: center.lng, address: pickerAddress };
             if (pickerMode === 'pickup') { setPickup(locationData); setPickupText(pickerAddress); } 
-            else { 
-                setDropoff(locationData); 
-                setDropoffText(pickerAddress); 
-                // إضافة الموقع المختار يدوياً للسجل أيضاً
-                addToHistory({ name: pickerAddress, lat: center.lat, lng: center.lng });
-            }
+            else { setDropoff(locationData); setDropoffText(pickerAddress); }
             setView('LOCATION_INPUT');
         };
 
         const handleSearchDrivers = () => {
             if(!pickup || !dropoff) return alert("الرجاء تحديد الوجهة");
             setView('DRIVER_SELECT');
-            setShowMapPreview(false);
+            setShowMapPreview(false); // التأكد من فتح القائمة أولاً
             get(ref(db, 'drivers')).then((snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -465,16 +385,22 @@
         ];
 
         // --- Views ---
+
         const MapThemeSwitcher = () => (
             <>
-                <button onClick={() => setShowStyleMenu(!showStyleMenu)} className="map-theme-btn" title="تغيير الخريطة"><Icon name="layers" size={20} className="text-gray-700"/></button>
+                <button onClick={() => setShowStyleMenu(!showStyleMenu)} className="map-theme-btn" title="تغيير الخريطة">
+                    <Icon name="layers" size={20} className="text-gray-700"/>
+                </button>
+                
                 {showStyleMenu && (
                     <div className="absolute top-[110px] left-4 z-[900] bg-white rounded-2xl p-3 shadow-xl w-48 animate-[scaleIn_0.15s] origin-top-left">
                         <div className="text-xs font-bold text-gray-400 mb-2 px-1">نوع الخريطة</div>
                         <div className="space-y-2">
                             {Object.entries(MAP_STYLES).map(([key, style]) => (
-                                <div key={key} onClick={() => { setMapStyle(key); setShowStyleMenu(false); }} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${mapStyle === key ? 'bg-black text-white' : 'hover:bg-gray-100'}`}>
-                                    <div className={`w-8 h-8 rounded-md border border-gray-300 ${style.preview}`}></div><span className="text-sm font-bold">{style.name}</span>
+                                <div key={key} onClick={() => { setMapStyle(key); setShowStyleMenu(false); }} 
+                                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${mapStyle === key ? 'bg-black text-white' : 'hover:bg-gray-100'}`}>
+                                    <div className={`w-8 h-8 rounded-md border border-gray-300 ${style.preview}`}></div>
+                                    <span className="text-sm font-bold">{style.name}</span>
                                 </div>
                             ))}
                         </div>
@@ -483,108 +409,107 @@
             </>
         );
 
-        // واجهة الإدخال الجديدة مع القائمة الذكية
-        const LocationInputView = () => (
-            <div className={`absolute inset-0 bg-white z-30 flex flex-col transition-transform duration-300 ${view === 'LOCATION_INPUT' ? 'translate-x-0' : 'translate-x-full'}`}>
-                <div className="safe-top p-4 flex items-center gap-4 border-b border-gray-50 shadow-sm z-10">
-                    <button onClick={() => setView('HOME')} className="p-2 rounded-full hover:bg-gray-100 transition"><Icon name="arrow-right" size={24}/></button>
-                    <div className="flex-1">
-                        <div className="text-xs text-gray-400 font-bold">وجهتك في {client.governorate}</div>
-                        <h2 className="text-lg font-bold">إلى أين؟</h2>
-                    </div>
-                </div>
-                
-                <div className="p-4 bg-gray-50 border-b border-gray-100">
-                     {/* حقل الوجهة (البحث) */}
-                     <div className="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-                         <div className="w-8 flex justify-center"><div className="w-2.5 h-2.5 bg-black rounded-sm"></div></div>
-                         <input className="flex-1 bg-transparent p-2 text-sm font-bold outline-none" value={dropoffText} onChange={(e) => handleSearchInput(e.target.value)} placeholder="ابحث عن منطقة (مثل: الهرم، الدقي...)" autoFocus />
-                         <button onClick={() => openMapPicker('dropoff')} className="p-2 bg-gray-100 rounded-lg text-gray-600"><Icon name="map" size={18}/></button>
-                     </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-4 py-2 no-scrollbar bg-white">
-                    {/* العناوين الفرعية */}
-                    {dropoffText === '' && (
-                        <div className="flex gap-2 mb-4 mt-2 overflow-x-auto no-scrollbar pb-2">
-                            {/* فلتر سريع (محاكاة) */}
-                            <div className="bg-black text-white px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap">الكل</div>
-                            <div className="bg-gray-100 text-gray-600 px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap">السجل</div>
-                            <div className="bg-gray-100 text-gray-600 px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap">الأكثر طلباً</div>
-                        </div>
-                    )}
-
-                    {/* القائمة المدمجة (سجل + مقترحات) */}
-                    <div className="space-y-1">
-                        {filteredDestinations.map((item, i) => (
-                            <div key={i} onClick={() => selectDestination(item)} className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 transition">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.type === 'history' ? 'bg-orange-50 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
-                                    <Icon name={item.type === 'history' ? 'clock' : 'map-pin'} size={20}/>
-                                </div>
-                                <div className="flex-1">
-                                    <div className="font-bold text-gray-900">{item.name}</div>
-                                    <div className="text-xs text-gray-400">
-                                        {item.type === 'history' ? 'من سجل رحلاتك' : `${client.governorate} • منطقة شهيرة`}
-                                    </div>
-                                </div>
-                                <Icon name="arrow-up-left" size={16} className="text-gray-300"/>
-                            </div>
-                        ))}
-                        
-                        {filteredDestinations.length === 0 && dropoffText !== '' && (
-                            <div className="text-center py-10 text-gray-400">
-                                <Icon name="search-x" size={40} className="mx-auto mb-2 opacity-20"/>
-                                لا توجد نتائج مطابقة في {client.governorate}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="p-4 safe-bottom border-t border-gray-50">
-                    <button onClick={handleSearchDrivers} disabled={!dropoff} className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg shadow-xl active:scale-95 transition disabled:opacity-50 disabled:scale-100">تأكيد الوجهة</button>
-                </div>
-            </div>
-        );
-
-        // (DriverSelectionView and MapPickerView remain largely same but ensure they use updated state)
         const DriverSelectionView = () => (
             <div className={`absolute inset-0 z-50 transition-transform duration-300 ${view === 'DRIVER_SELECT' ? 'translate-x-0' : 'translate-x-full'}`}>
+                
+                {/* 1. صفحة القائمة الكاملة للسائقين */}
                 <div className={`absolute inset-0 bg-gray-50 flex flex-col transition-transform duration-300 ${showMapPreview ? 'translate-y-full' : 'translate-y-0'}`}>
+                    {/* Header */}
                     <div className="safe-top bg-white px-6 pb-4 pt-4 shadow-sm z-10">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-2xl font-black">السائقين القريبين</h2>
-                            <button onClick={() => setShowMapPreview(true)} className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full font-bold text-sm hover:bg-gray-200 transition"><Icon name="map" size={16}/> الخريطة</button>
+                            {/* زر الخريطة - يرجعنا للمسار */}
+                            <button onClick={() => setShowMapPreview(true)} className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full font-bold text-sm hover:bg-gray-200 transition">
+                                <Icon name="map" size={16}/> الخريطة
+                            </button>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 p-3 rounded-xl"><Icon name="navigation" size={14}/><span>المسافة: {tripInfo.distance} كم</span><span className="mx-1">•</span><span>الوقت: {tripInfo.time} دقيقة</span></div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 p-3 rounded-xl">
+                            <Icon name="navigation" size={14}/>
+                            <span>المسافة: {tripInfo.distance} كم</span>
+                            <span className="mx-1">•</span>
+                            <span>الوقت: {tripInfo.time} دقيقة</span>
+                        </div>
                     </div>
+
+                    {/* القائمة */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
                         {availableDrivers.map(d => (
                             <div key={d.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="relative"><img src={d.photo} className="w-16 h-16 rounded-full bg-gray-100 object-cover border-2 border-white shadow-sm" /><div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full border-2 border-white">متاح</div></div>
+                                    <div className="relative">
+                                        <img src={d.photo} className="w-16 h-16 rounded-full bg-gray-100 object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full border-2 border-white">متاح</div>
+                                    </div>
                                     <div className="flex-1">
-                                        <div className="flex justify-between items-start"><h3 className="font-bold text-lg text-gray-900">{d.name}</h3><div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-lg"><Icon name="star" size={12} className="fill-yellow-400 text-yellow-400"/><span className="text-xs font-bold text-yellow-700">{d.rating}</span></div></div>
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="font-bold text-lg text-gray-900">{d.name}</h3>
+                                            <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-lg">
+                                                <Icon name="star" size={12} className="fill-yellow-400 text-yellow-400"/>
+                                                <span className="text-xs font-bold text-yellow-700">{d.rating}</span>
+                                            </div>
+                                        </div>
                                         <div className="text-sm text-gray-500 mt-0.5">{d.car}</div>
                                     </div>
                                 </div>
+                                
                                 <div className="flex items-center gap-3 mt-2 pt-4 border-t border-gray-50">
                                     <button className="flex-1 py-3 bg-black text-white rounded-xl font-bold text-sm shadow-md active:scale-95 transition">طلب الرحلة</button>
                                     <a href={`tel:${d.phone}`} className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded-xl text-gray-700 hover:bg-gray-200"><Icon name="phone" size={20}/></a>
                                 </div>
                             </div>
                         ))}
+                        <div className="h-10 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                            <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce"></div>
+                            جاري البحث عن المزيد...
+                        </div>
                     </div>
+
                     <div className="p-4 bg-white border-t border-gray-100 safe-bottom">
                          <button onClick={() => setView('LOCATION_INPUT')} className="w-full py-4 text-red-500 font-bold bg-red-50 rounded-xl hover:bg-red-100 transition">إلغاء البحث</button>
                     </div>
                 </div>
+
+                {/* 2. وضع معاينة الخريطة (يظهر عندما نضغط زر الخريطة من القائمة) */}
                 {showMapPreview && (
                     <div className="absolute inset-0 pointer-events-none flex flex-col justify-end pb-safe">
+                        {/* زر العودة للقائمة عائم */}
                         <div className="absolute top-0 left-0 right-0 p-4 safe-top pointer-events-auto flex justify-center">
-                            <button onClick={() => setShowMapPreview(false)} className="bg-black text-white px-6 py-3 rounded-full shadow-xl font-bold flex items-center gap-2 animate-[slideDown_0.3s]"><Icon name="list" size={18}/> العودة للقائمة</button>
+                            <button onClick={() => setShowMapPreview(false)} className="bg-black text-white px-6 py-3 rounded-full shadow-xl font-bold flex items-center gap-2 animate-[slideDown_0.3s]">
+                                <Icon name="list" size={18}/> العودة للقائمة
+                            </button>
+                        </div>
+                        
+                        {/* كارت ملخص صغير بالأسفل */}
+                        <div className="m-4 bg-white p-4 rounded-2xl shadow-xl pointer-events-auto animate-[slideUp_0.3s]">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <div className="font-bold text-gray-900">{availableDrivers.length} سائقين متاحين</div>
+                                    <div className="text-xs text-gray-500">أقرب سائق يبعد دقيقتين</div>
+                                </div>
+                                <button onClick={() => setShowMapPreview(false)} className="bg-black text-white px-4 py-2 rounded-xl text-sm font-bold">عرض القائمة</button>
+                            </div>
                         </div>
                     </div>
                 )}
+            </div>
+        );
+
+        // المكونات الأخرى (Home, Input, Picker) تبقى كما هي، لكن نضيف MapThemeSwitcher للخريطة
+        const HomeView = () => (
+            <div className={`absolute inset-0 bg-white z-20 flex flex-col transition-transform duration-300 ${view === 'HOME' ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="safe-top px-6 pt-6 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden"><img src={client.photo} className="w-full h-full object-cover"/></div>
+                         <div className="font-bold text-lg">مرحباً، {client.name.split(' ')[0]} 👋</div>
+                    </div>
+                    <div className="bg-gray-100 p-2 rounded-full"><Icon name="bell" size={20}/></div>
+                </div>
+                <div className="px-6 mt-6">
+                    <div onClick={() => setView('LOCATION_INPUT')} className="bg-black text-white p-5 rounded-3xl shadow-xl flex items-center justify-between cursor-pointer active:scale-98 transition transform">
+                        <div className="flex flex-col gap-1"><span className="text-2xl font-bold">إلى أين تريد الذهاب؟</span><span className="text-gray-400 text-sm">اضغط لتحديد وجهتك</span></div>
+                        <div className="bg-gray-800 p-3 rounded-full"><Icon name="arrow-left" size={24}/></div>
+                    </div>
+                </div>
             </div>
         );
 
@@ -597,7 +522,10 @@
                     <div className="center-pin-container">
                         <div className="flex flex-col items-center">
                             <div className="pin-bubble">{isMapMoving ? '...' : shortAddress}</div>
-                            <div className="relative z-10"><Icon name="map-pin" size={44} className={`drop-shadow-xl ${pickerMode === 'pickup' ? 'text-black fill-blue-500' : 'text-black fill-red-500'}`} strokeWidth={1.5} /><div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-sm"></div></div>
+                            <div className="relative z-10">
+                                <Icon name="map-pin" size={44} className={`drop-shadow-xl ${pickerMode === 'pickup' ? 'text-black fill-blue-500' : 'text-black fill-red-500'}`} strokeWidth={1.5} />
+                                <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-sm"></div>
+                            </div>
                             <div className="w-0.5 h-4 bg-black/50 mt-[-2px]"></div>
                         </div>
                     </div>
@@ -617,20 +545,35 @@
             </div>
         );
 
-        const HomeView = () => (
-            <div className={`absolute inset-0 bg-white z-20 flex flex-col transition-transform duration-300 ${view === 'HOME' ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="safe-top px-6 pt-6 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden"><img src={client.photo} className="w-full h-full object-cover"/></div>
-                         <div className="font-bold text-lg">مرحباً، {client.name.split(' ')[0]} 👋</div>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded-full"><Icon name="bell" size={20}/></div>
+        const LocationInputView = () => (
+            <div className={`absolute inset-0 bg-white z-30 flex flex-col transition-transform duration-300 ${view === 'LOCATION_INPUT' ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="safe-top p-4 flex items-center gap-4 border-b border-gray-50">
+                    <button onClick={() => setView('HOME')} className="p-2 rounded-full hover:bg-gray-100 transition"><Icon name="arrow-right" size={24}/></button>
+                    <h2 className="text-lg font-bold">تخطيط الرحلة</h2>
                 </div>
-                <div className="px-6 mt-6">
-                    <div onClick={() => setView('LOCATION_INPUT')} className="bg-black text-white p-5 rounded-3xl shadow-xl flex items-center justify-between cursor-pointer active:scale-98 transition transform">
-                        <div className="flex flex-col gap-1"><span className="text-2xl font-bold">إلى أين تريد الذهاب؟</span><span className="text-gray-400 text-sm">اضغط لتحديد وجهتك</span></div>
-                        <div className="bg-gray-800 p-3 rounded-full"><Icon name="arrow-left" size={24}/></div>
+                <div className="p-6">
+                    <div className="flex flex-col gap-4 relative">
+                        <div className="absolute right-[28px] top-[40px] bottom-[40px] w-0.5 bg-gray-200 border-l border-dashed border-gray-300"></div>
+                        <div className="flex items-center gap-3 relative z-10">
+                             <div className="w-8 flex justify-center mt-1"><div className="w-3 h-3 bg-blue-500 rounded-full ring-4 ring-blue-50"></div></div>
+                             <div className="flex-1 input-box rounded-xl p-1 flex items-center"><input className="flex-1 bg-transparent p-3 text-sm font-bold outline-none" value={pickupText} onChange={(e) => handleSearch(e.target.value, 'pickup')} placeholder="موقعك الحالي" /><button onClick={() => openMapPicker('pickup')} className="p-3 text-gray-400 hover:text-blue-600"><Icon name="map" size={20}/></button></div>
+                        </div>
+                        <div className="flex items-center gap-3 relative z-10">
+                             <div className="w-8 flex justify-center mt-1"><div className="w-3 h-3 bg-red-500 rounded-sm ring-4 ring-red-50"></div></div>
+                             <div className="flex-1 input-box rounded-xl p-1 flex items-center"><input className="flex-1 bg-transparent p-3 text-sm font-bold outline-none" value={dropoffText} onChange={(e) => handleSearch(e.target.value, 'dropoff')} placeholder="إلى أين؟" autoFocus /><button onClick={() => openMapPicker('dropoff')} className="p-3 text-gray-400 hover:text-red-600"><Icon name="map" size={20}/></button></div>
+                        </div>
                     </div>
+                </div>
+                <div className="flex-1 overflow-y-auto px-6 pb-20 no-scrollbar">
+                    {suggestions.map((item, i) => (
+                        <div key={i} className="flex items-center gap-4 p-4 mb-2 bg-gray-50 rounded-2xl cursor-pointer active:bg-gray-100 transition" onClick={() => selectSuggestion(item)}>
+                            <div className="bg-white p-2 rounded-full shadow-sm text-gray-600"><Icon name="map-pin" size={18}/></div>
+                            <div><div className="font-bold text-sm text-gray-800">{item.display_name.split(',')[0]}</div><div className="text-xs text-gray-500 truncate w-60">{item.display_name}</div></div>
+                        </div>
+                    ))}
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-6 safe-bottom bg-gradient-to-t from-white via-white to-transparent">
+                    <button onClick={handleSearchDrivers} disabled={!pickup || !dropoff} className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg shadow-xl active:scale-95 transition disabled:opacity-50 disabled:scale-100">يلا بينا (بحث)</button>
                 </div>
             </div>
         );
@@ -638,7 +581,10 @@
         return (
             <div className="relative h-screen w-full bg-gray-50 overflow-hidden">
                 <div id="map"></div>
+                
+                {/* زر تغيير ستايل الخريطة (يظهر فقط في واجهات معينة لتجنب الزحام) */}
                 {['HOME', 'MAP_PICKER', 'DRIVER_SELECT'].includes(view) && !showMapPreview && <MapThemeSwitcher />}
+                
                 <HomeView />
                 <LocationInputView />
                 <MapPickerView />
@@ -649,8 +595,8 @@
 
     const App = () => {
         const [clientData, setClientData] = React.useState(null);
-        React.useEffect(() => { const s = localStorage.getItem('client_app_v3'); if (s) setClientData(JSON.parse(s)); }, []);
-        return clientData ? <Dashboard client={clientData} /> : <Login onLogin={(d) => { setClientData(d); localStorage.setItem('client_app_v3', JSON.stringify(d)); }} />;
+        React.useEffect(() => { const s = localStorage.getItem('client_app_v2'); if (s) setClientData(JSON.parse(s)); }, []);
+        return clientData ? <Dashboard client={clientData} /> : <Login onLogin={(d) => { setClientData(d); localStorage.setItem('client_app_v2', JSON.stringify(d)); }} />;
     };
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
